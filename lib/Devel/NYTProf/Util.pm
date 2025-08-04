@@ -180,6 +180,8 @@ sub fmt_float {
 # Useful for making the time data more easily parseable
 my $fmt_time_opt = $ENV{NYTPROF_FMT_TIME}; # e.g., '%f' for 'raw' times
 
+# $fmt_time_opt = '%f';
+
 sub fmt_time {
     my ($sec, $width) = @_;
     $width = '' unless defined $width;
@@ -187,8 +189,8 @@ sub fmt_time {
     return '-'.fmt_time(-$sec, $width) if $sec < 0; # negative value, can happen
     return sprintf $fmt_time_opt, $sec if $fmt_time_opt;
     return sprintf "%$width.0fs", 0    unless $sec;
-    return sprintf "%$width.0fns",                              $sec * 1e9 if $sec < 1e-6;
-    return sprintf "%$width.0fµs",                              $sec * 1e6 if $sec < 1e-3;
+#     return sprintf "%$width.0fns",                              $sec * 1e9 if $sec < 1e-6;
+#     return sprintf "%$width.0fµs",                              $sec * 1e6 if $sec < 1e-3;
     return sprintf "%$width.*fms", 3 - length(int($sec * 1e3)), $sec * 1e3 if $sec < 1;
     return sprintf "%$width.*fs",  3 - length(int($sec      )), $sec       if $sec < 100;
     return sprintf "%$width.0fs", $sec;

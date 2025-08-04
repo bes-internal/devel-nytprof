@@ -47,7 +47,7 @@ BEGIN {
         our $profself = "nytprof-nytprofhtml.out";
         $ENV{NYTPROF} .= ":file=$profself:trace=1";
         require Devel::NYTProf;
-        END { warn "Profile of $0 written to $profself\n" if our $profself; } 
+        END { warn "Profile of $0 written to $profself\n" if our $profself; }
     }
 }
 
@@ -97,18 +97,19 @@ use constant NUMERIC_PRECISION => 5;
 my @on_ready_js;
 
 GetOptions(
-    'file|f=s'   => \(my $opt_file = 'nytprof.out'),
-    'lib|l=s'   => \my $opt_lib,
-    'out|o=s'   => \(my $opt_out = 'nytprof'),
-    'delete|d!' => \my $opt_delete,
-    'open!'     => \my $opt_open,
-    'help|h'    => sub { exit usage() },
-    'minimal|m!'=> \my $opt_minimal,
-    'flame!'    => \(my $opt_flame = 1),
-    'mergeevals!'=> \(my $opt_mergeevals = 1),
-    'flamewidth=i' => \(my $opt_flame_width = 1200),
-    'profself!'     => sub { }, # handled in BEGIN above
-    'debug!'        => \my $opt_debug,
+    'file|f=s'    => \(my $opt_file = 'nytprof.out'),
+    'lib|l=s'     => \my $opt_lib,
+    'out|o=s'     => \(my $opt_out = 'nytprof'),
+    'delete|d!'   => \my $opt_delete,
+    'open!'       => \my $opt_open,
+    'help|h'      => sub { exit usage() },
+    'minimal|m!'  => \my $opt_minimal,
+    'flame!'      => \(my $opt_flame = 1),
+    'mergeevals!' => \(my $opt_mergeevals = 1),
+    'flamewidth=i'=> \(my $opt_flame_width = 1200),
+    'profself!'   => sub { }, # handled in BEGIN above
+    'debug!'      => \my $opt_debug,
+    'thresholds=s'=> \my $opt_thresholds,
 ) or do { exit usage(); };
 
 
@@ -126,6 +127,7 @@ usage: [perl] nytprofhtml [opts]
  --flamewidth      <width> Width of the flame graph [default: 1200]
  --minimal,     -m         Don't generate graphviz .dot files or block/sub-level reports
  --no-mergeevals           Disable merging of string evals
+ --thresholds    <s:s:s:s> Use fixed time thresholds in seconds for severity colors (green:yellow:orange:red)
  --help,        -h         Print this message
 
 This script is part of the Devel::NYTProf distribution.
@@ -167,6 +169,13 @@ my $reporter = new Devel::NYTProf::Reader($opt_file, {
     quiet => 0,
     skip_collapse_evals => !$opt_mergeevals,
 });
+
+# extract thresholds
+my ($opt_thresholds_c3, $opt_thresholds_c2, $opt_thresholds_c1, $opt_thresholds_c0) = map {
+    my $item = $_;
+    if ($item eq "" || $item=~/[^\d.]/) { $item=undef; } else { $item+=0; }
+    $item;
+} split /:/, $opt_thresholds, 4 if $opt_thresholds;
 
 # place to store this
 $reporter->output_dir($opt_out);
@@ -845,7 +854,7 @@ sub output_index_page {
 
             print $fh qq{<div class="flamegraph">\n};
             print $fh qq{<object data="$call_stacks_svg" width="$opt_flame_width" type="image/svg+xml" >SVG not supported</object>\n};
-            print $fh qq{<p>The <a href="https://www.brendangregg.com/flamegraphs.html">Flame Graph</a> above is a visualization of the time spent in <em>distinct call stacks</em>. The colors and x-axis position are not meaningful.</p>\n};
+            print $fh qq{<p>The <a href="http://dtrace.org/blogs/brendan/2011/12/16/flame-graphs/">Flame Graph</a> above is a visualization of the time spent in <em>distinct call stacks</em>. The colors and x-axis position are not meaningful.</p>\n};
             print $fh qq{</div>\n};
             1;
         };
@@ -912,19 +921,19 @@ sub js_for_new_treemap {
         offset => 0, # (0/2/4) extra padding around nested levels
 
         Color => {
-            allow => 1,  
+            allow => 1,
             # value range for the $color property
-            minValue => 0,  
-            maxValue => scalar @treemap_colors,  
+            minValue => 0,
+            maxValue => scalar @treemap_colors,
             # corresponding color range [R,G,B]:
-            minColorValue => [0, 255, 50],  
+            minColorValue => [0, 255, 50],
             maxColorValue => [255, 0, 50],
         },
 
-        Tips => {  
+        Tips => {
             allow => 1,
-            offsetX => 20,  
-            offsetY => 20,  
+            offsetX => 20,
+            offsetY => 20,
         },
 
         selectPathOnHover => 1, # adds "over-<foo>" css class to elements
@@ -939,30 +948,30 @@ sub js_for_new_treemap {
         function init_$name() {
             var tm_args = $new_args_json;
 
-            //This method is invoked when a DOM element is created.  
-            //Its useful to set DOM event handlers here or manipulate  
-            //the DOM Treemap nodes.  
-            tm_args.onCreateElement = function(content, tree, isLeaf, leaf){  
+            //This method is invoked when a DOM element is created.
+            //Its useful to set DOM event handlers here or manipulate
+            //the DOM Treemap nodes.
+            tm_args.onCreateElement = function(content, tree, isLeaf, leaf){
                 //Add background image for cushion effect
-                if(isLeaf) { 
-                    var style = leaf.style,   
-                    width = parseInt(style.width) - 2,   
-                    height = parseInt(style.height) - 2;  
+                if(isLeaf) {
+                    var style = leaf.style,
+                    width = parseInt(style.width) - 2,
+                    height = parseInt(style.height) - 2;
                     // don't add gradient if too small to be worth the cost
                     if (width < 10 || height < 10) {   // is narrow
                         if (width < 50 && height < 50) // is small
                             return;
                     }
-                    leaf.innerHTML = tree.name +   
-                        "<img src=\\"js/jit/gradient-cushion1.png\\" " +  
-                        " style=\\"position:absolute;top:0;left:0;width:" +   
-                        width+"px;height:" + height+"px;\\" />";  
-                    style.width = width + "px";  
-                    style.height = height + "px";  
-                }  
+                    leaf.innerHTML = tree.name +
+                        "<img src=\\"js/jit/gradient-cushion1.png\\" " +
+                        " style=\\"position:absolute;top:0;left:0;width:" +
+                        width+"px;height:" + height+"px;\\" />";
+                    style.width = width + "px";
+                    style.height = height + "px";
+                }
             };
 
-            // add content to the tooltip when a node is hovered  
+            // add content to the tooltip when a node is hovered
             // move to separate function later
             tm_args.Tips.onShow = function(tip, node, isLeaf, domElement) {
                 tip.innerHTML = node.data.tip;
@@ -1198,7 +1207,7 @@ sub output_subs_callgraph_dot_file {
         next if $sub_filter and not $sub_filter->($si, undef);
 
         my $called_by_subnames = $si->called_by_subnames;
-        if (!%$called_by_subnames) { 
+        if (!%$called_by_subnames) {
             warn sprintf "%s has no caller subnames but a call count of %d\n",
                     $subname, $si->calls;
             next;
@@ -1409,7 +1418,7 @@ sub output_file_table {
     @fis = sort { $b->meta->{'time'} <=> $a->meta->{'time'} } @fis;
 
     my $dev_time = calculate_median_absolute_deviation([map { scalar $_->meta->{'time'} } @fis], 1);
-    
+
     foreach my $fi (@fis) {
         my $meta = $fi->meta;
         my $fid = $fi->fid;
@@ -1532,7 +1541,21 @@ sub determine_severity {
         ? fmt_time($val)
         : fmt_float($val, NUMERIC_PRECISION);
 
-    my $class;
+    my $class='';
+
+    if ($is_time && $opt_thresholds) {
+    if (defined $stats) {
+        if (defined $opt_thresholds_c3 && $val >= $opt_thresholds_c3) { $class = 'c3';  }
+        if (defined $opt_thresholds_c2 && $val >= $opt_thresholds_c2) { $class = 'c2';  }
+        if (defined $opt_thresholds_c1 && $val >= $opt_thresholds_c1) { $class = 'c1';  }
+        if (defined $opt_thresholds_c0 && $val >= $opt_thresholds_c0) { $class = 'c0';  }
+    }
+    else {
+        $class = 'n';
+    }
+    }
+
+    if (!$is_time || !$opt_thresholds) {
     if (defined $stats) {
 
         my $devs = ($val - $stats->[1]);    #stats->[1] is the mean.
@@ -1556,6 +1579,7 @@ sub determine_severity {
     }
     else {
         $class = 'n';
+    }
     }
 
     if ($title) {
@@ -1741,7 +1765,7 @@ sub get_page_header {
     push @body_attribs, qq{onload="$args{body_onload}"} if $args{body_onload};
     my $body_attribs = join "; ", @body_attribs;
 
-    return qq{<body $body_attribs> 
+    return qq{<body $body_attribs>
 <div class="header" style="position: relative; overflow-x: hidden; overflow-y: hidden; z-index: 0; ">
 $back_link
 <div class="headerForeground" style="float: left">
@@ -1828,13 +1852,13 @@ body { font-family: sans-serif; margin: 0px; background-color: white; color:#222
 .siteTitle { font-size: 2em; }
 .siteSubTitle { font-size: 1.2em; }
 
-.header_back { 
-    position: absolute; 
+.header_back {
+    position: absolute;
     padding: 10px;
 }
 .header_back > a:link,
 .header_back > a:visited {
-    color: white; 
+    color: white;
     text-decoration: none;
     font-size: 0.75em;
 }
@@ -1850,14 +1874,14 @@ body { font-family: sans-serif; margin: 0px; background-color: white; color:#222
 }
 .footer { margin: 30px; }
 
-table { 
-    border-collapse: collapse; 
-    border-spacing: 0px; 
+table {
+    border-collapse: collapse;
+    border-spacing: 0px;
     margin-top: 20px;
 }
-tr { 
+tr {
     text-align : center;
-    vertical-align: top; 
+    vertical-align: top;
 }
 th,.h {
     background-color: #dddddd;
@@ -1865,8 +1889,8 @@ th,.h {
     padding: 0em 0.4em 0em 0.4em;
     font-size:0.8em;
 }
-td { 
-    border: solid 1px #cccccc; 
+td {
+    border: solid 1px #cccccc;
     padding: 0em 0.4em 0em 0.4em;
 }
 caption {
@@ -1983,7 +2007,7 @@ multiple files. See L<Devel::NYTProf> and L<nytprofmerge>.)
 
 The reports include dynamic runtime analysis wherein each line and each file
 is analyzed based on the performance of the other lines and files.  As a
-result, you can quickly find the slowest module and the slowest line in a 
+result, you can quickly find the slowest module and the slowest line in a
 module.  Slowness is measured in three ways: total calls, total time, and
 average time per call.
 
