@@ -2,8 +2,6 @@
 FileHandle.c
 FileHandle.o
 MANIFEST.bak
-MYMETA.json
-MYMETA.yml
 Makefile
 Makefile.old
 NYTProf.bs
